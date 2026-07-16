@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 from urllib.parse import quote, urlparse
 
@@ -29,6 +29,7 @@ RECEIPT_TAG = "receipts"
 MAX_CONTENT_CHARS = 12_000
 EMPTY_LIST_LABEL = "(none)"
 NO_CONTENT_LABEL = "(no extracted text)"
+FALLBACK_CREATED_DATE = "1990-01-01"
 
 
 def _base_url() -> str:
@@ -144,6 +145,27 @@ def truncate_content(content: str | None) -> str:
     return content[:MAX_CONTENT_CHARS]
 
 
+def normalize_created_date(raw: str) -> str:
+    """Normalize a date string to YYYY-MM-DD for Paperless ``created`` PATCH."""
+    trimmed = raw.strip()
+    if not trimmed:
+        return FALLBACK_CREATED_DATE
+
+    date_part = trimmed.split("T", maxsplit=1)[0]
+    try:
+        return date.fromisoformat(date_part).isoformat()
+    except ValueError:
+        pass
+
+    for fmt in ("%d.%m.%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(trimmed, fmt).date().isoformat()
+        except ValueError:
+            continue
+
+    return FALLBACK_CREATED_DATE
+
+
 @DBOS.step()
 def get_document(document_id: int) -> PaperlessDocument:
     data = _request("GET", f"/documents/{document_id}/")
@@ -221,6 +243,20 @@ def list_document_ids_needing_processing(field_id: int, limit: int) -> list[int]
             doc = PaperlessDocumentSummary.model_validate(item)
             if not _custom_field_is_set(doc.custom_fields, field_id):
                 ids.append(doc.id)
+            if len(ids) >= limit:
+                break
+        next_path = page.get("next")
+    return ids
+
+
+@DBOS.step()
+def list_recent_document_ids(limit: int) -> list[int]:
+    ids: list[int] = []
+    next_path: str | None = "/documents/?ordering=-added&fields=id&page_size=100"
+    while next_path and len(ids) < limit:
+        page = _request("GET", next_path)
+        for item in page["results"]:
+            ids.append(int(item["id"]))
             if len(ids) >= limit:
                 break
         next_path = page.get("next")

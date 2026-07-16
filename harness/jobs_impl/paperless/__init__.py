@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from . import triggers
+from . import agents, triggers  # noqa: F401 — agents registers DBOSAgents before launch
 
 
 def post_launch_setup() -> None:
@@ -15,5 +15,5 @@ def get_routers() -> list[APIRouter]:
     return [triggers.router]
 
 
-def produce(limit: int | None = None) -> int:
-    return triggers.produce(limit)
+def produce(limit: int | None = None, *, force: bool = False) -> int:
+    return triggers.produce(limit, force=force)

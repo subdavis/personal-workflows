@@ -41,6 +41,7 @@ class PaperlessDocument(BaseModel):
     tags: list[int] = Field(default_factory=list)
     correspondent: int | None = None
     document_type: int | None = None
+    created: str | None = None
     custom_fields: list[CustomFieldValue] = Field(default_factory=list)
 
 
@@ -56,6 +57,7 @@ class DocumentPatch(BaseModel):
     tags: list[int] | None = None
     correspondent: int | None = None
     document_type: int | None = None
+    created: str | None = None
     custom_fields: list[CustomFieldValue] | None = None
 
 
@@ -64,6 +66,7 @@ class ClassificationResult(BaseModel):
     tag_names: list[str] = Field(default_factory=list, alias="tagNames")
     correspondent_name: str | None = Field(default=None, alias="correspondentName")
     document_type_name: str | None = Field(default=None, alias="documentTypeName")
+    document_date: str | None = Field(default=None, alias="documentDate")
 
     model_config = {"populate_by_name": True}
 

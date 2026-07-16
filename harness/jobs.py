@@ -8,12 +8,20 @@ the enqueue idempotent (the same key runs at most once; reruns use a fresh key).
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable
 from typing import Any
 
 from dbos import DBOS, SetWorkflowID, WorkflowHandle
 
 JOBS_QUEUE = "jobs"
+
+
+def dedup_key(base: str, *, force: bool = False) -> str:
+    """Return a stable workflow id, or a unique one when forcing a rerun."""
+    if not force:
+        return base
+    return f"{base}:force:{uuid.uuid4()}"
 
 
 def enqueue(

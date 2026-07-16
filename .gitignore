@@ -13,3 +13,5 @@ data/
 # DBOS local
 .dbos/
 *.sqlite
+
+planning/

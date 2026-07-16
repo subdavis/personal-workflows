@@ -19,7 +19,9 @@ CLASSIFIER_INSTRUCTIONS = (
     "a new name for a clear sender not in the list, or return null if no sender is identifiable. "
     "Pick a document type ONLY from the provided list — never invent new ones. If nothing fits, return null. "
     "Pick zero or more tags ONLY from the provided tag list — never invent new tags. "
-    "Choose the ones that genuinely apply. Match names exactly as they appear in the lists."
+    "Choose the ones that genuinely apply. Match names exactly as they appear in the lists. "
+    "Extract the document's creation or issue date from the text when visible, as documentDate in YYYY-MM-DD format; "
+    "return null when no date is identifiable."
 )
 
 RECEIPT_INSTRUCTIONS = (
@@ -30,11 +32,6 @@ RECEIPT_INSTRUCTIONS = (
     "Choose a purchase category ONLY from the list of options provided in the prompt — never invent a new one. "
     "If none clearly fits, return null. Match the category label exactly as it appears in the provided list."
 )
-
-_classifier: Agent[None, ClassificationResult] | None = None
-_receipt: Agent[None, ExtractionResult] | None = None
-_classifier_dbos: DBOSAgent[None, ClassificationResult] | None = None
-_receipt_dbos: DBOSAgent[None, ExtractionResult] | None = None
 
 
 def build_classification_prompt(
@@ -95,17 +92,14 @@ def _build_receipt() -> Agent[None, ExtractionResult]:
     )
 
 
+# Register DBOSAgents at import time (before DBOS.launch()) for workflow recovery.
+_classifier_dbos = DBOSAgent(_build_classifier())
+_receipt_dbos = DBOSAgent(_build_receipt())
+
+
 def get_classifier_agent() -> DBOSAgent[None, ClassificationResult]:
-    global _classifier, _classifier_dbos
-    if _classifier_dbos is None:
-        _classifier = _build_classifier()
-        _classifier_dbos = DBOSAgent(_classifier)
     return _classifier_dbos
 
 
 def get_receipt_agent() -> DBOSAgent[None, ExtractionResult]:
-    global _receipt, _receipt_dbos
-    if _receipt_dbos is None:
-        _receipt = _build_receipt()
-        _receipt_dbos = DBOSAgent(_receipt)
     return _receipt_dbos

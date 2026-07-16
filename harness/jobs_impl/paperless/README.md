@@ -16,7 +16,7 @@ Runs when a new document arrives (webhook), is picked up by the scheduled sweep,
 1. Skips documents that already have the `paperless-ai-processed` date field set.
 2. Loads the document OCR text and the archive's existing tags, correspondents, and document types.
 3. Asks the classifier agent for a title, tags, correspondent, and document type — choosing only from existing tags and types, but allowing a new correspondent when the sender is clearly identified.
-4. Writes the results back to Paperless: always updates the title and merges new tags; fills correspondent and document type only when the document lacks them; stamps today's date in `paperless-ai-processed`.
+4. Writes the results back to Paperless: always updates the title and merges new tags; fills correspondent and document type only when the document lacks them; sets the creation date (`created`) from the extracted document date, falling back to the existing value; stamps today's date in `paperless-ai-processed`.
 5. If the result is a purchase receipt (type **Purchase Receipts** or tag **Receipts**), enqueues `process_receipt` as a separate durable job.
 
 ### `process_receipt`
@@ -57,11 +57,15 @@ Set these in `.env` (see the repo root `.env.example`):
 | Entrypoint | Auth | Action |
 |------------|------|--------|
 | `POST /webhooks/paperless` | Bearer | Enqueue `process_document` for `documentId` or a document URL |
+| `POST /webhooks/paperless?force=true` | Bearer | Re-run classification even if `paperless-ai-processed` is set |
 | `POST /webhooks/paperless/receipt` | Bearer | Enqueue `process_receipt` for a document |
+| `POST /webhooks/paperless/receipt?force=true` | Bearer | Re-run receipt extraction even if amount/category are set |
 | DBOS schedule `paperless-scan` | n/a | Sweep unprocessed documents (`PAPERLESS_SCAN_CRON`, `PAPERLESS_SCAN_LIMIT`) |
-| `uv run populate_jobs --limit N` | n/a | One-shot backfill sweep |
+| `uv run populate_jobs --limit N` | n/a | One-shot backfill sweep (unprocessed only) |
+| `uv run populate_jobs --limit N --force` | n/a | Re-enqueue the N most recent documents |
 
 Webhook body accepts `{"documentId": 123}` or `{"url": "https://…/documents/123/"}` (or `?url=`).
+Append `?force=true` to bypass skip checks and enqueue a fresh DBOS workflow run.
 
 Receipt extraction runs when a document is typed **Purchase Receipts** or tagged **Receipts**.
 
@@ -129,24 +133,35 @@ curl -sS -X POST "http://localhost:8080/webhooks/paperless?url=http://localhost:
   -H "Authorization: Bearer change-me"
 ```
 
-A `202` response with `{"accepted":true,"document_id":123}` means the job was enqueued.
+**Force reprocess** (already processed or bad metadata):
+
+```bash
+curl -sS -X POST "http://localhost:8080/webhooks/paperless?force=true" \
+  -H "Authorization: Bearer change-me" \
+  -H "Content-Type: application/json" \
+  -d '{"documentId": 123}'
+```
+
+A `202` response with `{"accepted":true,"document_id":123,"forced":true}` means the job was enqueued.
 With `serve`, the queue worker runs in-process; watch the terminal for workflow logs.
 
 ### 4. Verify it worked
 
-- **Paperless UI**: document should get an updated title/tags and the `paperless-ai-processed`
+- **Paperless UI**: document should get an updated title/tags, a creation date matching the document text when identifiable, and the `paperless-ai-processed`
   custom field stamped with today's date.
 - **DBOS admin** (while `serve` is running): `http://localhost:3001` lists workflow status.
-- **Re-run safety**: documents already stamped `paperless-ai-processed` are skipped by
-  `process_document`.
+- **Re-run safety**: without `force=true`, documents already stamped `paperless-ai-processed`
+  are skipped by `process_document`, and DBOS deduplicates on the stable workflow id.
+  Use `?force=true` to bypass both gates.
 
 ### 5. Alternative: sweep instead of webhook
 
 Enqueue every unprocessed document (up to limit) without naming an id:
 
 ```bash
-uv run populate_jobs --limit 1   # enqueue
-uv run run_jobs --limit 1        # drain (separate terminal if not using serve)
+uv run populate_jobs --limit 1        # enqueue unprocessed
+uv run populate_jobs --limit 1 --force  # re-enqueue most recent
+uv run run_jobs --limit 1             # drain (separate terminal if not using serve)
 ```
 
 ## Package layout

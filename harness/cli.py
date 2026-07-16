@@ -48,13 +48,18 @@ def populate_jobs_main(argv: list[str] | None = None) -> None:
     """Run producers once, enqueuing up to ``--limit`` jobs."""
     parser = argparse.ArgumentParser(prog="populate_jobs")
     parser.add_argument("--limit", type=int, default=None, help="max jobs to enqueue")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="re-enqueue processed docs (most recent first, not just unprocessed)",
+    )
     args = parser.parse_args(argv)
 
     launch_dbos()
     try:
         from . import jobs_impl
 
-        enqueued = jobs_impl.produce(limit=args.limit)
+        enqueued = jobs_impl.produce(limit=args.limit, force=args.force)
         print(f"enqueued {enqueued} job(s)")
     finally:
         _shutdown()

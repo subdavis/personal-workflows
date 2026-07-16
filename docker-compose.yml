@@ -15,8 +15,7 @@ services:
       timeout: 3s
       retries: 10
 
-  # Webhook listener + producer. Also owns cron schedules.
-  api:
+  app:
     build: .
     command: ["python", "-m", "harness.cli", "serve"]
     env_file: .env
@@ -24,17 +23,6 @@ services:
       DBOS_SYSTEM_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/workflow_explorer
     ports:
       - "8080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  # Consumer: drains the durable jobs queue and runs handlers.
-  worker:
-    build: .
-    command: ["python", "-m", "harness.cli", "run_jobs"]
-    env_file: .env
-    environment:
-      DBOS_SYSTEM_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/workflow_explorer
     depends_on:
       postgres:
         condition: service_healthy

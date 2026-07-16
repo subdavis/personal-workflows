@@ -22,6 +22,6 @@ def get_routers() -> list[APIRouter]:
     return paperless.get_routers()
 
 
-def produce(limit: int | None = None) -> int:
+def produce(limit: int | None = None, *, force: bool = False) -> int:
     """Run each job's one-shot producer; return the total number of jobs enqueued."""
-    return paperless.produce(limit)
+    return paperless.produce(limit, force=force)

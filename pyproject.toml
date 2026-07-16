@@ -23,6 +23,7 @@ serve = "harness.cli:serve_main"
 [dependency-groups]
 dev = [
     "poethepoet>=0.48.0",
+    "pytest>=9.1.1",
     "ruff>=0.8",
     "ty>=0.0.1a1",
 ]
@@ -38,6 +39,7 @@ packages = ["harness"]
 src = ["."]
 line-length = 100
 target-version = "py311"
+extend-exclude = ["planning"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
@@ -52,11 +54,19 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "lf"
 
+[tool.ty.src]
+exclude = ["planning"]
+
 [tool.ty.environment]
 root = ["."]
 python-version = "3.11"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.poe.tasks]
+test = { cmd = "pytest", help = "Run integration tests" }
+
 format = [
     { cmd = "ruff check --fix .", help = "Fix lint and sort imports" },
     { cmd = "ruff format .", help = "Format code" },

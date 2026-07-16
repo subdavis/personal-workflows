@@ -6,7 +6,7 @@ from datetime import date
 
 from dbos import DBOS
 
-from harness.jobs import enqueue
+from harness.jobs import dedup_key, enqueue
 
 from .agents import (
     build_classification_prompt,
@@ -27,6 +27,7 @@ from .client import (
     is_processed,
     load_archive_lists,
     merge_receipt_custom_fields,
+    normalize_created_date,
     option_id_for_label,
     should_trigger_receipt,
     update_document,
@@ -40,7 +41,7 @@ def current_date_iso() -> str:
 
 
 @DBOS.workflow()
-def process_receipt(document_id: int) -> ProcessReceiptResult:
+def process_receipt(document_id: int, *, force: bool = False) -> ProcessReceiptResult:
     doc = get_document(document_id)
     amount_field = get_custom_field_by_name(DOLLAR_AMOUNT_FIELD)
     category_field = get_custom_field_by_name(PURCHASE_CATEGORY_FIELD)
@@ -51,7 +52,7 @@ def process_receipt(document_id: int) -> ProcessReceiptResult:
 
     amount_populated = has_custom_field_value(doc, amount_field.id)
     category_populated = has_custom_field_value(doc, category_field.id)
-    if amount_populated and category_populated:
+    if not force and amount_populated and category_populated:
         return ProcessReceiptResult(document_id=document_id, status="skipped")
 
     category_options = category_field.extra_data.select_options
@@ -78,10 +79,10 @@ def process_receipt(document_id: int) -> ProcessReceiptResult:
 
 
 @DBOS.workflow()
-def process_document(document_id: int) -> ProcessDocumentResult:
+def process_document(document_id: int, *, force: bool = False) -> ProcessDocumentResult:
     processed_field_id = ensure_processed_field()
     doc = get_document(document_id)
-    if is_processed(doc, processed_field_id):
+    if not force and is_processed(doc, processed_field_id):
         return ProcessDocumentResult(document_id=document_id, status="skipped")
 
     tags, correspondents, document_types = load_archive_lists()
@@ -126,6 +127,10 @@ def process_document(document_id: int) -> ProcessDocumentResult:
     if document_type_id is not None:
         patch.document_type = document_type_id
 
+    created_raw = classification.document_date or doc.created
+    if created_raw:
+        patch.created = normalize_created_date(created_raw)
+
     update_document(document_id, patch)
 
     receipt_triggered = should_trigger_receipt(
@@ -136,7 +141,12 @@ def process_document(document_id: int) -> ProcessDocumentResult:
         document_types=document_types,
     )
     if receipt_triggered:
-        enqueue(process_receipt, document_id, dedup_key=f"paperless:receipt:{document_id}")
+        enqueue(
+            process_receipt,
+            document_id,
+            force=force,
+            dedup_key=dedup_key(f"paperless:receipt:{document_id}", force=force),
+        )
 
     return ProcessDocumentResult(
         document_id=document_id,
