@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: workflow_explorer
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Webhook listener + producer. Also owns cron schedules.
+  api:
+    build: .
+    command: ["python", "-m", "harness.cli", "serve"]
+    env_file: .env
+    environment:
+      DBOS_SYSTEM_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/workflow_explorer
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Consumer: drains the durable jobs queue and runs handlers.
+  worker:
+    build: .
+    command: ["python", "-m", "harness.cli", "run_jobs"]
+    env_file: .env
+    environment:
+      DBOS_SYSTEM_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/workflow_explorer
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

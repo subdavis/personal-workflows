@@ -1,0 +1,9 @@
+# DBOS application config. The system database URL is supplied via the
+# DBOS_SYSTEM_DATABASE_URL environment variable (see .env.example); we construct
+# DBOS() in code (harness/dbos_app.py) rather than relying on this file for
+# connection details, but DBOS tooling (`dbos` CLI, migrations) reads it.
+name: workflow-explorer
+language: python
+runtimeConfig:
+  start:
+    - "python -m harness.cli serve"
