@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import pytest
 from dbos import DBOS
 from fastapi.testclient import TestClient
@@ -11,6 +13,12 @@ from harness.config import get_settings
 from harness.dbos_app import launch_dbos
 
 
+def pytest_configure() -> None:
+    """Set dummy LLM keys before test collection imports job agents."""
+    os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
+    os.environ.setdefault("OPENAI_API_KEY", "test-key")
+
+
 @pytest.fixture()
 def dbos_app(tmp_path, monkeypatch):
     """Launch DBOS against an isolated SQLite database for each test."""
@@ -18,6 +26,8 @@ def dbos_app(tmp_path, monkeypatch):
     monkeypatch.setenv("WEBHOOK_BEARER_TOKEN", "test-token")
     monkeypatch.setenv("PAPERLESS_URL", "http://paperless.test")
     monkeypatch.setenv("PAPERLESS_TOKEN", "fake")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     get_settings.cache_clear()
 
     import harness.dbos_app as dbos_mod

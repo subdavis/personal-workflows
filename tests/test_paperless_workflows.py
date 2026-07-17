@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from harness.jobs_impl.paperless.client import DOLLAR_AMOUNT_FIELD, PURCHASE_CATEGORY_FIELD
 from harness.jobs_impl.paperless.schemas import (
     ClassificationResult,
     CustomFieldDefinition,
@@ -54,7 +53,7 @@ def _sample_doc(*, processed: bool = False) -> PaperlessDocument:
 def _amount_field() -> CustomFieldDefinition:
     return CustomFieldDefinition(
         id=AMOUNT_FIELD_ID,
-        name=DOLLAR_AMOUNT_FIELD,
+        name="dollar-amount",
         data_type="monetary",
         extra_data=CustomFieldExtraData(default_currency="USD"),
     )
@@ -63,7 +62,7 @@ def _amount_field() -> CustomFieldDefinition:
 def _category_field() -> CustomFieldDefinition:
     return CustomFieldDefinition(
         id=CATEGORY_FIELD_ID,
-        name=PURCHASE_CATEGORY_FIELD,
+        name="purchase-category",
         data_type="select",
         extra_data=CustomFieldExtraData(select_options=CATEGORY_OPTIONS),
     )
@@ -177,8 +176,8 @@ def receipt_mocks():
         patch(
             "harness.jobs_impl.paperless.workflows.get_custom_field_by_name",
             side_effect=lambda name: {
-                DOLLAR_AMOUNT_FIELD: _amount_field(),
-                PURCHASE_CATEGORY_FIELD: _category_field(),
+                "dollar-amount": _amount_field(),
+                "purchase-category": _category_field(),
             }[name],
         ),
         patch(
