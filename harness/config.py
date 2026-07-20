@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     paperless_scan_cron: str = "*/30 * * * *"
     paperless_scan_limit: int = 25
 
+    # --- Google Sheets (receipt export) ---
+    google_sheets_spreadsheet_id: str = ""
+    google_sheets_worksheet_name: str = "Receipts"
+    google_application_credentials: str | None = None
+
 
 def _sync_llm_api_keys(settings: Settings) -> None:
     """Expose LLM API keys from Settings to os.environ for Pydantic AI providers."""

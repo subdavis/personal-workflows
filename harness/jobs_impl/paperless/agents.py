@@ -30,7 +30,9 @@ RECEIPT_INSTRUCTIONS = (
     "not a subtotal or any single line item. "
     "Return the total as a plain number (e.g. 42.17), with no currency symbol or thousands separators. "
     "Choose a purchase category ONLY from the list of options provided in the prompt — never invent a new one. "
-    "If none clearly fits, return null. Match the category label exactly as it appears in the provided list."
+    "If none clearly fits, return null. Match the category label exactly as it appears in the provided list. "
+    "When a payment card number is visible, return only its last four digits as cardLastFour (e.g. '4242'); "
+    "return null when no card number is shown."
 )
 
 
@@ -63,7 +65,7 @@ def build_classification_prompt(
 def build_extraction_prompt(*, category_options: list[SelectOption], content: str) -> str:
     return "\n".join(
         [
-            "Extract the purchase total and spending category from this receipt.",
+            "Extract the purchase total, spending category, and payment card last four digits from this receipt.",
             "",
             "=== PURCHASE CATEGORIES (choose only one of these labels, or null) ===",
             ", ".join(option.label for option in category_options) or EMPTY_LIST_LABEL,

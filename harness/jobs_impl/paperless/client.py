@@ -196,6 +196,21 @@ def update_document(document_id: int, patch: DocumentPatch) -> PaperlessDocument
 
 
 @DBOS.step()
+def get_correspondent(correspondent_id: int) -> NamedEntity:
+    data = _request("GET", f"/correspondents/{correspondent_id}/")
+    return NamedEntity.model_validate(data)
+
+
+def normalize_card_last_four(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    digits = "".join(character for character in raw if character.isdigit())
+    if len(digits) < 4:
+        return None
+    return digits[-4:]
+
+
+@DBOS.step()
 def create_correspondent(name: str) -> NamedEntity:
     trimmed = name.strip()
     try:
