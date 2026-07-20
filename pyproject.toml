@@ -13,6 +13,8 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.5",
     "logfire>=3.0",
+    "google-api-python-client>=2.100",
+    "google-auth>=2.0",
 ]
 
 [project.scripts]

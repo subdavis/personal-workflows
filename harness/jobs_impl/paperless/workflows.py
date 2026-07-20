@@ -20,6 +20,7 @@ from .client import (
     build_processed_custom_fields,
     create_correspondent,
     ensure_processed_field,
+    get_correspondent,
     get_custom_field_by_name,
     get_document,
     has_custom_field_value,
@@ -27,12 +28,14 @@ from .client import (
     is_processed,
     load_archive_lists,
     merge_receipt_custom_fields,
+    normalize_card_last_four,
     normalize_created_date,
     option_id_for_label,
     should_trigger_receipt,
     update_document,
 )
 from .schemas import DocumentPatch, ProcessDocumentResult, ProcessReceiptResult
+from .sheets import append_receipt_row
 
 
 @DBOS.step()
@@ -69,6 +72,20 @@ def process_receipt(document_id: int, *, force: bool = False) -> ProcessReceiptR
         default_currency=amount_field.extra_data.default_currency,
     )
     update_document(document_id, DocumentPatch(custom_fields=custom_fields))
+
+    store_name: str | None = None
+    if doc.correspondent is not None:
+        store_name = get_correspondent(doc.correspondent).name
+
+    receipt_date = normalize_created_date(doc.created) if doc.created else current_date_iso()
+    category_label = result.purchase_category if category_option_id is not None else None
+    append_receipt_row(
+        receipt_date=receipt_date,
+        store=store_name,
+        category=category_label,
+        card_last_four=normalize_card_last_four(result.card_last_four),
+        amount=result.dollar_amount,
+    )
 
     return ProcessReceiptResult(
         document_id=document_id,

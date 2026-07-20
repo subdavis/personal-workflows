@@ -74,6 +74,7 @@ class ClassificationResult(BaseModel):
 class ExtractionResult(BaseModel):
     dollar_amount: float | None = Field(default=None, alias="dollarAmount")
     purchase_category: str | None = Field(default=None, alias="purchaseCategory")
+    card_last_four: str | None = Field(default=None, alias="cardLastFour")
 
     model_config = {"populate_by_name": True}
 

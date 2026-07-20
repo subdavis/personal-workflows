@@ -50,6 +50,10 @@ def _sample_doc(*, processed: bool = False) -> PaperlessDocument:
     )
 
 
+def _receipt_doc() -> PaperlessDocument:
+    return _sample_doc().model_copy(update={"correspondent": 10, "created": "2026-07-16"})
+
+
 def _amount_field() -> CustomFieldDefinition:
     return CustomFieldDefinition(
         id=AMOUNT_FIELD_ID,
@@ -167,11 +171,15 @@ def test_process_document_enqueues_receipt_workflow(dbos_app, classify_mocks):
 @pytest.fixture()
 def receipt_mocks():
     """Patch Paperless steps and receipt agent for process_receipt tests."""
-    extraction = ExtractionResult(dollar_amount=5.47, purchase_category="Food & Drink")
+    extraction = ExtractionResult(
+        dollar_amount=5.47,
+        purchase_category="Food & Drink",
+        card_last_four="4242",
+    )
     with (
         patch(
             "harness.jobs_impl.paperless.workflows.get_document",
-            return_value=_sample_doc(),
+            return_value=_receipt_doc(),
         ),
         patch(
             "harness.jobs_impl.paperless.workflows.get_custom_field_by_name",
@@ -185,16 +193,23 @@ def receipt_mocks():
             return_value=_receipt_agent(extraction),
         ) as mock_get_agent,
         patch("harness.jobs_impl.paperless.workflows.update_document") as mock_update,
+        patch(
+            "harness.jobs_impl.paperless.workflows.get_correspondent",
+            return_value=NamedEntity(id=10, name="Starbucks"),
+        ),
+        patch("harness.jobs_impl.paperless.workflows.append_receipt_row") as mock_append,
+        patch("harness.jobs_impl.paperless.workflows.current_date_iso", return_value="2026-07-16"),
     ):
         yield {
             "extraction": extraction,
             "get_agent": mock_get_agent,
             "update_document": mock_update,
+            "append_receipt_row": mock_append,
         }
 
 
 def test_process_receipt_skips_when_fields_populated(dbos_app, receipt_mocks):
-    doc = _sample_doc()
+    doc = _receipt_doc()
     doc.custom_fields = [
         CustomFieldValue(field=AMOUNT_FIELD_ID, value="USD5.47"),
         CustomFieldValue(field=CATEGORY_FIELD_ID, value="cat-food"),
@@ -205,6 +220,7 @@ def test_process_receipt_skips_when_fields_populated(dbos_app, receipt_mocks):
     assert result == ProcessReceiptResult(document_id=42, status="skipped")
     receipt_mocks["get_agent"].return_value.run_sync.assert_not_called()
     receipt_mocks["update_document"].assert_not_called()
+    receipt_mocks["append_receipt_row"].assert_not_called()
 
 
 def test_process_receipt_extracts_and_patches(dbos_app, receipt_mocks):
@@ -226,3 +242,11 @@ def test_process_receipt_extracts_and_patches(dbos_app, receipt_mocks):
     category = next(field for field in patch.custom_fields if field.field == CATEGORY_FIELD_ID)
     assert amount.value == "USD5.47"
     assert category.value == "cat-food"
+
+    receipt_mocks["append_receipt_row"].assert_called_once_with(
+        receipt_date="2026-07-16",
+        store="Starbucks",
+        category="Food & Drink",
+        card_last_four="4242",
+        amount=5.47,
+    )
